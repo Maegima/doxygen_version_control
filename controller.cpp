@@ -44,18 +44,19 @@ void getComment(fstream& file, map<string, string> conf){
     }
     while(!file.eof()){
         switch(state){
-            case 0:
+            case 0: state = 1; break;
+            case 1:
                 if(c == '/'){
                     temp << c;
                     c = file.get();
-                    temp << c;
                     if(c == '/')
-                        state = 1;
-                    else if(c == '*')
                         state = 2;
+                    else if(c == '*')
+                        state = 3;
                 }
+                temp << c;
                 break;
-            case 1:
+            case 2:
                 file.getline(l, 2048);
                 line = c;
                 line += l;
@@ -70,17 +71,17 @@ void getComment(fstream& file, map<string, string> conf){
                     temp << line.substr(e+1) << endl;
                 }
                 else{
-                    temp << line;
+                    temp << line << endl;
                 }
-                state = 0;    
+                state = 1;    
                 break;
-            case 2:
+            case 3:
                 file.getline(l, 2048);
                 line = c;
                 line += l;
                 //cout << "(" << line << ")" << endl;
                 if(line.find("*/") != string::npos)
-                    state = 0;
+                    state = 1;
                 b = line.find("$[");
                 e = line.find("]");
                 if(b != string::npos && e != string::npos){
