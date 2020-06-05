@@ -31,17 +31,15 @@ string trim(string s){
     return s.substr(b,e);
 }
 
-void getComment(fstream& file, map<string, string> conf){
-    int state = 0;
-    char l[2048];
+void insertDynamicInformantion(string filepath, map<string, string> conf){
+    int state = 0, b, e;
+    char l[2048], c = 0;
     string line, word;
-    int b, e;
-    char c = 0;
-    fstream temp;
-    temp.open("temp.temp", std::fstream::out);
-    if(temp.fail()){
-        cout << "errado" << endl;
-    }
+    fstream file, temp;
+    conf["file"] = "file.test.cpp";
+    file.open(filepath, fstream::in);
+    filepath += ".temp.tmp";
+    temp.open(filepath, std::fstream::out);
     while(!file.eof()){
         switch(state){
             case 0: state = 1; break;
@@ -118,12 +116,9 @@ int main(){
             config[key] = value;
         }
     }
-    for(pair<string, string> item : config){
-        cout << "(" << item.first << ":" << item.second << ")" << endl;
-    }
-    fstream testo;
-    testo.open("file.test.cpp");
-    config["file"] = "file.test.cpp";
-    getComment(testo, config);
+    // for(pair<string, string> item : config){
+    //     cout << "(" << item.first << ":" << item.second << ")" << endl;
+    // }
+    insertDynamicInformantion("file.test.cpp", config);
     return 0;
 }
