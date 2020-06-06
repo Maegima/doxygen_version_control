@@ -30,24 +30,40 @@ string trim(string s){
     return s.substr(b,e);
 }
 
-bool testIfHasDynamicInformation(string filepath){
+string getLastInformation(string filepath){
     ifstream file;
     char l[2048];
-    int b;
-    string line;
+    int b, e, state = 0;
+    string line, info = "";
     file.open(filepath);
-    if(file.fail()) return false;
-    while(!file.eof()){
-        file.getline(l, 2048);
-        line = l;
-        b = line.find("$[");
-        if(b != string::npos && line.find("]", b)){ 
-            file.close();
-            return true;
-        }
+    if(file.fail()) return info;
+    while(!file.eof() || state < 3){
+        switch(state){
+            case 0: state = 1; break;
+            case 1: 
+                if(l[0] == '/'){
+                    l[0] = file.get();
+                    if(l[0] == '*') state = 2;
+                }
+            case 2:
+                file.getline(l+1, 2047);
+                line = l;
+                if(line.find("*/") != string::npos) state = 3;
+                b = line.find("@");
+                if(b != string::npos){
+                    e = line.find(" ", b);
+                    if(e != string::npos){
+                        info = line.substr(b+1, e-b-1);
+                        cout << info << endl;
+                    }
+                }
+                break;
+            default: break;
+            }
+        l[0] = file.get();
     }
     file.close();
-    return false;
+    return info;
 }
 
 void insertDynamicInformantion(string filepath, map<string, string> conf){
@@ -124,6 +140,10 @@ void insertDynamicInformantion(string filepath, map<string, string> conf){
     rename(temppath.c_str(), filepath.c_str());
 }
 
+void dynamicDoxygenHeader(string filepath, map<string, string> info){
+
+}
+
 int main(){
     ifstream data;
     map<string, string> config;
@@ -142,15 +162,11 @@ int main(){
             config[key] = value;
         }
     }
-    for(pair<string, string> item : config){
+    /*for(pair<string, string> item : config){
         cout << "(" << item.first << ":" << item.second << ")" << endl;
-    }
-    if(testIfHasDynamicInformation("file.test.cpp"))
-        insertDynamicInformantion("file.test.cpp", config);
-    else
-    {
-        cout << "up to date" << endl;
-    }
-    
+    }*/
+    getLastInformation("file.test.cpp");
+        /*insertDynamicInformantion("file.test.cpp", config);
+    else*/
     return 0;
 }
