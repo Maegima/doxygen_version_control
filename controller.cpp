@@ -6,22 +6,20 @@
 
 using namespace std;
 
-string getDate(){
-    string res;
-    time_t timer;
-    tm *now_tm;
-    time(&timer);  /* get current time; same as: timer = time(NULL)  */
-    now_tm = localtime(&timer);
-    now_tm->tm_year += 1900;
-    now_tm->tm_mon += 1;
-    res = to_string(now_tm->tm_year);
-    res += "-";
-    res += '0' + (now_tm->tm_mon/10);
-    res += '0' + (now_tm->tm_mon%10);
-    res += "-";
-    res += '0' + (now_tm->tm_mday/10);
-    res += '0' + (now_tm->tm_mday%10); 
-    return res;
+string timeToDateString(time_t time){
+    string str;
+    tm *_tm;
+    _tm = localtime(&time);
+    _tm->tm_year += 1900;
+    _tm->tm_mon += 1;
+    str = to_string(_tm->tm_year);
+    str += "-";
+    str += '0' + (_tm->tm_mon/10);
+    str += '0' + (_tm->tm_mon%10);
+    str += "-";
+    str += '0' + (_tm->tm_mday/10);
+    str += '0' + (_tm->tm_mday%10); 
+    return str;
 }
 
 string trim(string s){
@@ -131,7 +129,7 @@ int main(){
     map<string, string> config;
     string line, key, value;
     char str[256];
-    config["date"] = getDate();
+    config["date"] = timeToDateString(time(NULL));
     data.open("data.txt");
     while(!data.eof()){
         int div;
