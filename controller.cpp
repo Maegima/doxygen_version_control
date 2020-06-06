@@ -2,6 +2,7 @@
 #include <fstream>
 #include <ctime>
 #include <map>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -31,15 +32,38 @@ string trim(string s){
     return s.substr(b,e);
 }
 
+bool testIfHasDynamicInformation(string filepath){
+    ifstream file;
+    char l[2048];
+    int b;
+    string line;
+    file.open(filepath);
+    if(file.fail()) return false;
+    while(!file.eof()){
+        file.getline(l, 2048);
+        line = l;
+        b = line.find("$[");
+        if(b != string::npos && line.find("]", b)){ 
+            file.close();
+            return true;
+        }
+    }
+    file.close();
+    return false;
+}
+
 void insertDynamicInformantion(string filepath, map<string, string> conf){
     int state = 0, b, e;
     char l[2048], c = 0;
-    string line, word;
-    fstream file, temp;
-    conf["file"] = "file.test.cpp";
-    file.open(filepath, fstream::in);
-    filepath += ".temp.tmp";
-    temp.open(filepath, std::fstream::out);
+    string line, word, temppath;
+    ofstream temp;
+    ifstream file;
+    conf["file"] = filepath;
+    file.open(filepath);
+    if(file.fail()) return;
+    temppath = filepath + ".temp.tmp";
+    temp.open(temppath, std::fstream::out);
+    if(temp.fail()) return;
     while(!file.eof()){
         switch(state){
             case 0: state = 1; break;
@@ -86,7 +110,7 @@ void insertDynamicInformantion(string filepath, map<string, string> conf){
                     temp << line.substr(0,b);
                     word = trim(line.substr(b+2, e-b-2));
                     temp << conf[word];
-                    //cout << line << endl;
+                    cout << word << endl;
                     temp << line.substr(e+1) << endl;
                 }
                 else{
@@ -96,6 +120,10 @@ void insertDynamicInformantion(string filepath, map<string, string> conf){
         }
         c = file.get();
     }
+    file.close();
+    temp.close();
+    remove(filepath.c_str());
+    rename(temppath.c_str(), filepath.c_str());
 }
 
 int main(){
@@ -116,9 +144,15 @@ int main(){
             config[key] = value;
         }
     }
-    // for(pair<string, string> item : config){
-    //     cout << "(" << item.first << ":" << item.second << ")" << endl;
-    // }
-    insertDynamicInformantion("file.test.cpp", config);
+    for(pair<string, string> item : config){
+        cout << "(" << item.first << ":" << item.second << ")" << endl;
+    }
+    if(testIfHasDynamicInformation("file.test.cpp"))
+        insertDynamicInformantion("file.test.cpp", config);
+    else
+    {
+        cout << "up to date" << endl;
+    }
+    
     return 0;
 }
