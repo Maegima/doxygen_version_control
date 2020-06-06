@@ -37,7 +37,7 @@ string getLastInformation(string filepath){
     string line, info = "";
     file.open(filepath);
     if(file.fail()) return info;
-    while(!file.eof() || state < 3){
+    while(!file.eof() && state < 3){
         switch(state){
             case 0: state = 1; break;
             case 1: 
@@ -45,6 +45,7 @@ string getLastInformation(string filepath){
                     l[0] = file.get();
                     if(l[0] == '*') state = 2;
                 }
+                break;
             case 2:
                 file.getline(l+1, 2047);
                 line = l;
@@ -66,82 +67,57 @@ string getLastInformation(string filepath){
     return info;
 }
 
-void insertDynamicInformantion(string filepath, map<string, string> conf){
-    int state = 0, b, e;
-    char l[2048], c = 0;
-    string line, word, temppath;
-    ofstream temp;
+void dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     ifstream file;
-    conf["file"] = filepath;
+    ofstream temp;
+    char l[2048];
+    int b, e, state = 0;
+    string line, lastInfo, key;
     file.open(filepath);
-    if(file.fail()) return;
-    temppath = filepath + ".temp.tmp";
-    temp.open(temppath, std::fstream::out);
-    if(temp.fail()) return;
-    while(!file.eof()){
+    if(file.fail()) state = 4;
+    temp.open(filepath + ".tmp");
+    if(file.fail()) state = 4;
+    lastInfo = getLastInformation(filepath);
+    if(lastInfo.compare("") == 0) state = 4;
+    while(!file.eof() && state < 4){
         switch(state){
             case 0: state = 1; break;
-            case 1:
-                if(c == '/'){
-                    temp << c;
-                    c = file.get();
-                    if(c == '/')
-                        state = 2;
-                    else if(c == '*')
-                        state = 3;
+            case 1: 
+                if(l[0] == '/'){
+                    temp << l[0];
+                    l[0] = file.get();
+                    if(l[0] == '*') state = 2;
                 }
-                temp << c;
+                temp << l[0];
                 break;
             case 2:
-                file.getline(l, 2048);
-                line = c;
-                line += l;
-                //cout << line << endl;
-                b = line.find("$[");
-                e = line.find("]");
-                if(b != string::npos && e != string::npos){
-                    temp << line.substr(0,b);
-                    word = trim(line.substr(b+2, e-b-2));
-                    temp << conf[word];
-                    //cout << line << endl;
-                    temp << line.substr(e+1) << endl;
+                file.getline(l+1, 2047);
+                line = l;
+                if(line.find("*/") != string::npos) state = 3;
+                b = line.find("@");
+                if(b != string::npos){
+                    e = line.find(" ", b);
+                    if(e != string::npos){
+                        key = line.substr(b+1, e-b-1);
+                        if(key.compare(lastInfo) == 0) state = 3;
+                        if(infoList[key].compare("") != 0){
+                            line = line.substr(0, e+1) + infoList[key];
+                        }
+                    }
                 }
-                else{
-                    temp << line << endl;
-                }
-                state = 1;    
+                temp << line << endl;
                 break;
             case 3:
-                file.getline(l, 2048);
-                line = c;
-                line += l;
-                //cout << "(" << line << ")" << endl;
-                if(line.find("*/") != string::npos)
-                    state = 1;
-                b = line.find("$[");
-                e = line.find("]");
-                if(b != string::npos && e != string::npos){
-                    temp << line.substr(0,b);
-                    word = trim(line.substr(b+2, e-b-2));
-                    temp << conf[word];
-                    cout << word << endl;
-                    temp << line.substr(e+1) << endl;
-                }
-                else{
-                    temp << line << endl;
-                }
+                temp << l[0];
                 break;
-        }
-        c = file.get();
+            default: break;
+            }
+        l[0] = file.get();
     }
-    file.close();
-    temp.close();
+    if(file.is_open()) file.close();
+    if(temp.is_open()) temp.close();
     remove(filepath.c_str());
-    rename(temppath.c_str(), filepath.c_str());
-}
-
-void dynamicDoxygenHeader(string filepath, map<string, string> info){
-
+    rename((filepath + ".tmp").c_str(), filepath.c_str());
 }
 
 int main(){
@@ -165,8 +141,9 @@ int main(){
     /*for(pair<string, string> item : config){
         cout << "(" << item.first << ":" << item.second << ")" << endl;
     }*/
-    getLastInformation("file.test.cpp");
+    //getLastInformation("file.test.cpp");
         /*insertDynamicInformantion("file.test.cpp", config);
     else*/
+    dynamicDoxygenHeader("file.test.cpp", config);
     return 0;
 }
