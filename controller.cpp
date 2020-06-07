@@ -2,7 +2,9 @@
 #include <fstream>
 #include <ctime>
 #include <map>
+#include <dirent.h>
 #include <sys/stat.h>
+#include <list>
 
 using namespace std;
 
@@ -30,6 +32,47 @@ string trim(string s){
     return s.substr(b,e);
 }
 
+bool informantionUpToDate(string filepath, map<string, string> infoList){
+    ifstream file;
+    char l[2048];
+    int b, e, state = 0;
+    string line, key, info;
+    file.open(filepath);
+    if(file.fail()) return false;
+    while(!file.eof() && state < 3){
+        switch(state){
+            case 0: state = 1; break;
+            case 1: 
+                if(l[0] == '/'){
+                    l[0] = file.get();
+                    if(l[0] == '*') state = 2;
+                }
+                break;
+            case 2:
+                file.getline(l+1, 2047);
+                line = l;
+                if(line.find("*/") != string::npos) state = 3;
+                b = line.find("@");
+                if(b != string::npos){
+                    e = line.find(" ", b);
+                    if(e != string::npos){
+                        key = line.substr(b+1, e-b-1);
+                        info = line.substr(e+1);
+                        if(infoList[key].compare("") != 0){
+                            if(infoList[key].compare(info) != 0) state = 4;
+                        }
+                    }
+                }
+                break;
+            default: break;
+            }
+        l[0] = file.get();
+    }
+    file.close();
+    if(state == 4) return false;
+    return true;
+}
+
 string getLastInformation(string filepath){
     ifstream file;
     char l[2048];
@@ -55,7 +98,6 @@ string getLastInformation(string filepath){
                     e = line.find(" ", b);
                     if(e != string::npos){
                         info = line.substr(b+1, e-b-1);
-                        cout << info << endl;
                     }
                 }
                 break;
@@ -67,18 +109,66 @@ string getLastInformation(string filepath){
     return info;
 }
 
-void dynamicDoxygenHeader(string filepath, map<string, string> infoList){
+bool validExtension(string file){
+    int size = file.size();
+    if(file.find(".h", size-2) != string::npos)
+        return true;
+    if(file.find(".c", size-2) != string::npos)
+        return true;
+    if(file.find(".cpp", size-4) != string::npos)
+        return true;
+    if(file.find(".hpp", size-4) != string::npos)
+        return true;
+    return false;
+}
+
+void fileListRecursive(string name, string prefix, int maxLevel, list<string>& lst){
+    struct stat info;
+    string filename = prefix + name;
+    if(maxLevel > 0){
+        stat(filename.c_str(), &info);
+        if(S_ISREG(info.st_mode)){
+            if(validExtension(filename))
+                lst.push_back(filename);
+        } else if(S_ISDIR(info.st_mode)){
+            DIR *dir = opendir(filename.c_str());
+            struct dirent *entry;
+            if(dir){
+                while( (entry = readdir(dir)) != NULL ){
+                    name = entry->d_name;
+                    if(name[0] != '.')
+                        fileListRecursive(name, filename + "/", maxLevel-1, lst);
+                }
+            }
+        }
+    }
+}
+
+list<string> fileList(string path){
+    DIR *dir = opendir(path.c_str());
+    list<string> lst;
+    if(dir)
+        fileListRecursive(path, "", 10, lst);
+    return lst;
+}
+
+int dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     ifstream file;
     ofstream temp;
     char l[2048];
-    int b, e, state = 0;
+    int b, e; 
+    unsigned int state = 0;
+    b = filepath.rfind("/");
+    if(b == string::npos) b = -1;
+    infoList["file"] = filepath.substr(b+1);
     string line, lastInfo, key;
     file.open(filepath);
-    if(file.fail()) state = 4;
+    if(file.fail()) state += 4;
     temp.open(filepath + ".tmp");
-    if(file.fail()) state = 4;
+    if(file.fail()) state += 8;
     lastInfo = getLastInformation(filepath);
-    if(lastInfo.compare("") == 0) state = 4;
+    if(lastInfo.compare("") == 0) state += 16;
+    if(informantionUpToDate(filepath, infoList)) state += 32;
     while(!file.eof() && state < 4){
         switch(state){
             case 0: state = 1; break;
@@ -116,34 +206,57 @@ void dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     }
     if(file.is_open()) file.close();
     if(temp.is_open()) temp.close();
-    remove(filepath.c_str());
-    rename((filepath + ".tmp").c_str(), filepath.c_str());
+    if(state == 3){
+        remove(filepath.c_str());
+        rename((filepath + ".tmp").c_str(), filepath.c_str());
+    } 
+    else if((state & 8) == 0){ 
+        remove((filepath + ".tmp").c_str());
+    }
+    return state;
 }
 
 int main(){
+    ofstream status;
     ifstream data;
     map<string, string> config;
+    map<string, time_t> lastUpdate;
     string line, key, value;
+    time_t tvalue;
     char str[256];
     config["date"] = timeToDateString(time(NULL));
     data.open("data.txt");
-    while(!data.eof()){
-        int div;
-        data.getline(str, 256);
-        line = str;
-        div = line.find(':');
-        key = trim(line.substr(0,div));
-        value = trim(line.substr(div+1));
-        if(key.size() > 0){
-            config[key] = value;
+    if(!data.fail()){ 
+        while(!data.eof()){
+            int div;
+            data.getline(str, 256);
+            line = str;
+            div = line.find(':');
+            key = trim(line.substr(0,div));
+            value = trim(line.substr(div+1));
+            if(key.size() > 0){
+                config[key] = value;
+            }
+        }
+        data.close();
+    }
+    data.open(".status.ddh");
+    if(!data.fail()){
+        while(!data.eof()){
+            data.getline(str, 256, ' ');
+            key = str;
+            data >> tvalue;
+            lastUpdate[key] = tvalue;
+        }
+        data.close();
+    }
+    status.open(".status.ddh");
+    list<string> lst = fileList(".");
+    for(string file : lst){
+        cout << file << endl;
+        if(dynamicDoxygenHeader(file, config) == 3){
+            
         }
     }
-    /*for(pair<string, string> item : config){
-        cout << "(" << item.first << ":" << item.second << ")" << endl;
-    }*/
-    //getLastInformation("file.test.cpp");
-        /*insertDynamicInformantion("file.test.cpp", config);
-    else*/
-    dynamicDoxygenHeader("file.test.cpp", config);
     return 0;
 }
