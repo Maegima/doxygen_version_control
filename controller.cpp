@@ -45,7 +45,7 @@ bool informantionUpToDate(string filepath, map<string, string> infoList){
     string line, key, info;
     file.open(filepath);
     if(file.fail()) return false;
-    while(!file.eof() && state < 3){
+    while(!file.eof() && state < 4){
         switch(state){
             case 0: state = 1; break;
             case 1: 
@@ -57,7 +57,24 @@ bool informantionUpToDate(string filepath, map<string, string> infoList){
             case 2:
                 file.getline(l+1, 2047);
                 line = l;
-                if(line.find("*/") != string::npos) state = 3;
+                b = line.find("@file ");
+                if(b != string::npos){
+                    state = 3;
+                    if(line.find("*/") != string::npos) state = 4;
+                    key = "file";
+                    info = line.substr(b+6);
+                    if(infoList[key].compare("") != 0){
+                        if(infoList[key].compare(info) != 0) state = 5;
+                    }
+                }
+                else{
+                    if(line.find("*/") != string::npos) state = 1;
+                }
+                break;
+            case 3:
+                file.getline(l+1, 2047);
+                line = l;
+                if(line.find("*/") != string::npos) state = 4;
                 b = line.find("@");
                 if(b != string::npos){
                     e = line.find(" ", b);
@@ -65,7 +82,7 @@ bool informantionUpToDate(string filepath, map<string, string> infoList){
                         key = line.substr(b+1, e-b-1);
                         info = line.substr(e+1);
                         if(infoList[key].compare("") != 0){
-                            if(infoList[key].compare(info) != 0) state = 4;
+                            if(infoList[key].compare(info) != 0) state = 5;
                         }
                     }
                 }
@@ -75,7 +92,7 @@ bool informantionUpToDate(string filepath, map<string, string> infoList){
         l[0] = file.get();
     }
     file.close();
-    if(state == 4) return false;
+    if(state == 5) return false;
     return true;
 }
 
@@ -87,7 +104,7 @@ string getLastInformation(string filepath){
     string line, info = "";
     file.open(filepath);
     if(file.fail()) return info;
-    while(!file.eof() && state < 3){
+    while(!file.eof() && state < 4){
         switch(state){
             case 0: state = 1; break;
             case 1: 
@@ -99,7 +116,20 @@ string getLastInformation(string filepath){
             case 2:
                 file.getline(l+1, 2047);
                 line = l;
-                if(line.find("*/") != string::npos) state = 3;
+                b = line.find("@file ");
+                if(b != string::npos){
+                    state = 3;
+                    if(line.find("*/") != string::npos) state = 4;
+                    info = line.substr(b+1, e-b-1);
+                }
+                else{
+                    if(line.find("*/") != string::npos) state = 1;
+                }
+                break;
+            case 3:
+                file.getline(l+1, 2047);
+                line = l;
+                if(line.find("*/") != string::npos) state = 4;
                 b = line.find("@");
                 if(b != string::npos){
                     e = line.find(" ", b);
@@ -207,7 +237,7 @@ unsigned int dynamicDoxygenHeader(FileInfo& fileInfo, map<string, string> &infoL
             case 2:
                 file.getline(l+1, 2047);
                 line = l;
-                if(line.find("*/") != string::npos) state = 3;
+                if(line.find("*/") != string::npos) state = 1;
                 b = line.find("@");
                 if(b != string::npos){
                     e = line.find(" ", b);
@@ -251,7 +281,7 @@ int main(){
     char str[256];
     bool writeUpdate = false;
     unsigned int state;
-    data.open("data.txt");
+    data.open(".conf.ddh");
     if(!data.fail()){ 
         while(!data.eof()){
             int div;

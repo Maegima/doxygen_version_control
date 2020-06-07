@@ -1,3 +1,0 @@
-   author  : André Lucas Maegima   
-  version   : 1.0   
- copyright: Copyright (c) 2019
