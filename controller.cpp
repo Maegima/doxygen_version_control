@@ -8,6 +8,11 @@
 
 using namespace std;
 
+struct FileInfo{
+    std::string name;
+    time_t mtime;
+};
+
 string timeToDateString(time_t time){
     string str;
     tm *_tm;
@@ -124,14 +129,14 @@ bool validExtension(string file){
     return false;
 }
 
-void fileListRecursive(string name, string prefix, int maxLevel, list<string>& lst){
+void fileListRecursive(string name, string prefix, int maxLevel, list<FileInfo>& lst){
     struct stat info;
     string filename = prefix + name;
     if(maxLevel > 0){
         stat(filename.c_str(), &info);
         if(S_ISREG(info.st_mode)){
             if(validExtension(filename))
-                lst.push_back(filename);
+                lst.push_back({filename, info.st_mtime});
         } else if(S_ISDIR(info.st_mode)){
             DIR *dir = opendir(filename.c_str());
             struct dirent *entry;
@@ -141,45 +146,53 @@ void fileListRecursive(string name, string prefix, int maxLevel, list<string>& l
                     if(name[0] != '.')
                         fileListRecursive(name, filename + "/", maxLevel-1, lst);
                 }
+                closedir(dir);
             }
         }
     }
 }
 
-list<string> fileList(string path){
+list<FileInfo> fileList(string path){
     DIR *dir = opendir(path.c_str());
-    list<string> lst;
-    if(dir)
+    list<FileInfo> lst;
+    if(dir){
         fileListRecursive(path, "", 10, lst);
+        closedir(dir);
+    }
     return lst;
 }
 
-time_t lastModifiedTime(string file, time_t lastUpdate){
+bool isUpToDate(FileInfo file, time_t lastUpdate){
+    if(file.mtime > lastUpdate)
+        return (timeToDateString(lastUpdate).compare(timeToDateString(file.mtime)) == 0);
+    return true;
+}
+
+time_t getMTime(string file){
     struct stat st;
-    stat(file.c_str(), &st);
-    if(st.st_mtime > lastUpdate)
-        if(timeToDateString(lastUpdate).compare(timeToDateString(st.st_mtime)) != 0)
-            return st.st_mtime;
+    if(stat(file.c_str(), &st) == 0)
+        return st.st_mtime;
     return 0;
 }
 
-int dynamicDoxygenHeader(string filepath, map<string, string> infoList){
+unsigned int dynamicDoxygenHeader(FileInfo& fileInfo, map<string, string> &infoList){
     ifstream file;
     ofstream temp;
     char l[2048];
     size_t b, e; 
     unsigned int state = 0;
-    b = filepath.rfind("/");
+    b = fileInfo.name.rfind("/");
     if(b == string::npos) b = -1;
-    infoList["file"] = filepath.substr(b+1);
+    infoList["file"] = fileInfo.name.substr(b+1);
+    infoList["date"] = timeToDateString(fileInfo.mtime);
     string line, lastInfo, key;
-    file.open(filepath);
+    file.open(fileInfo.name);
     if(file.fail()) state += 4;
-    temp.open(filepath + ".tmp");
+    temp.open(fileInfo.name + ".tmp");
     if(file.fail()) state += 8;
-    lastInfo = getLastInformation(filepath);
+    lastInfo = getLastInformation(fileInfo.name);
     if(lastInfo.compare("") == 0) state += 16;
-    if(informantionUpToDate(filepath, infoList)) state += 32;
+    if(informantionUpToDate(fileInfo.name, infoList)) state += 32;
     while(!file.eof() && state < 4){
         switch(state){
             case 0: state = 1; break;
@@ -218,11 +231,12 @@ int dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     if(file.is_open()) file.close();
     if(temp.is_open()) temp.close();
     if(state == 3){
-        remove(filepath.c_str());
-        rename((filepath + ".tmp").c_str(), filepath.c_str());
+        remove(fileInfo.name.c_str());
+        rename((fileInfo.name + ".tmp").c_str(), fileInfo.name.c_str());
+        fileInfo.mtime = getMTime(fileInfo.name);
     } 
     else if((state & 8) == 0){ 
-        remove((filepath + ".tmp").c_str());
+        remove((fileInfo.name + ".tmp").c_str());
     }
     return state;
 }
@@ -236,7 +250,7 @@ int main(){
     time_t tvalue;
     char str[256];
     bool writeUpdate = false;
-    config["date"] = timeToDateString(time(NULL));
+    unsigned int state;
     data.open("data.txt");
     if(!data.fail()){ 
         while(!data.eof()){
@@ -257,31 +271,34 @@ int main(){
         while(!data.eof()){
             data.getline(str, 256, ' ');
             key = str;
-            data >> tvalue;
-            lastUpdate[key] = tvalue;
+            if(key.compare("") != 0){
+                data >> tvalue;
+                lastUpdate[key] = tvalue;
+            }
+            data.getline(str, 256);
         }
         data.close();
     }
-    list<string> lst = fileList(".");
-    for(string file : lst){
-        cout << file << " ltime: " << lastUpdate[file] << endl;
-        tvalue = lastModifiedTime(file, lastUpdate[file]);
-        if(tvalue > 0){
-            if(dynamicDoxygenHeader(file, config) == 3){
-                cout << file << " mtime: " << tvalue << endl; 
-                lastUpdate[file] = tvalue;
-                writeUpdate = true;
-            }
+    list<FileInfo> lst = fileList(".");
+    for(FileInfo& file : lst){
+        cout << file.name << " "; 
+        cout << "ltime: " << lastUpdate[file.name] << " ";
+        cout << "mtime: " << file.mtime << " ";
+        if(!isUpToDate(file, lastUpdate[file.name])){
+            state = dynamicDoxygenHeader(file, config);
+            cout << "etime: " << file.mtime << " ";
+            cout << "state: " << state << " ";
+            writeUpdate = true;
         }
+        cout << endl;
     }
     if(writeUpdate){
         status.open(".status.ddh");
         if(status.fail()) return 0;
-        for(string file : lst){
-            if(lastUpdate[file] > 0){
-                status << file << " " << lastUpdate[file] << endl;
-            }
+        for(FileInfo file : lst){
+            status << file.name << " " << file.mtime << endl;
         }
+        status.close();
     }
     return 0;
 }
