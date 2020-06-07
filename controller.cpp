@@ -152,6 +152,15 @@ list<string> fileList(string path){
     return lst;
 }
 
+time_t lastModifiedTime(string file, time_t lastUpdate){
+    struct stat st;
+    stat(file.c_str(), &st);
+    if(st.st_mtime > lastUpdate)
+        if(timeToDateString(lastUpdate).compare(timeToDateString(st.st_mtime)) != 0)
+            return st.st_mtime;
+    return 0;
+}
+
 int dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     ifstream file;
     ofstream temp;
@@ -224,6 +233,7 @@ int main(){
     string line, key, value;
     time_t tvalue;
     char str[256];
+    bool writeUpdate = false;
     config["date"] = timeToDateString(time(NULL));
     data.open("data.txt");
     if(!data.fail()){ 
@@ -250,12 +260,25 @@ int main(){
         }
         data.close();
     }
-    status.open(".status.ddh");
     list<string> lst = fileList(".");
     for(string file : lst){
-        cout << file << endl;
-        if(dynamicDoxygenHeader(file, config) == 3){
-            
+        cout << file << " ltime: " << lastUpdate[file] << endl;
+        tvalue = lastModifiedTime(file, lastUpdate[file]);
+        if(tvalue > 0){
+            if(dynamicDoxygenHeader(file, config) == 3){
+                cout << file << " mtime: " << tvalue << endl; 
+                lastUpdate[file] = tvalue;
+                writeUpdate = true;
+            }
+        }
+    }
+    if(writeUpdate){
+        status.open(".status.ddh");
+        if(status.fail()) return 0;
+        for(string file : lst){
+            if(lastUpdate[file] > 0){
+                status << file << " " << lastUpdate[file] << endl;
+            }
         }
     }
     return 0;
