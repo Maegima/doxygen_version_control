@@ -25,7 +25,7 @@ string timeToDateString(time_t time){
 }
 
 string trim(string s){
-    int b = 0, e = s.size();
+    size_t b = 0, e = s.size();
     while(b < e && s[b] == ' ') b++;
     while(e > 0 && s[e-1] == ' ') e--;
     e = e - b; 
@@ -35,7 +35,8 @@ string trim(string s){
 bool informantionUpToDate(string filepath, map<string, string> infoList){
     ifstream file;
     char l[2048];
-    int b, e, state = 0;
+    size_t b, e;
+    unsigned int state = 0;
     string line, key, info;
     file.open(filepath);
     if(file.fail()) return false;
@@ -76,7 +77,8 @@ bool informantionUpToDate(string filepath, map<string, string> infoList){
 string getLastInformation(string filepath){
     ifstream file;
     char l[2048];
-    int b, e, state = 0;
+    size_t b, e;
+    unsigned int state = 0;
     string line, info = "";
     file.open(filepath);
     if(file.fail()) return info;
@@ -110,7 +112,7 @@ string getLastInformation(string filepath){
 }
 
 bool validExtension(string file){
-    int size = file.size();
+    size_t size = file.size();
     if(file.find(".h", size-2) != string::npos)
         return true;
     if(file.find(".c", size-2) != string::npos)
@@ -165,7 +167,7 @@ int dynamicDoxygenHeader(string filepath, map<string, string> infoList){
     ifstream file;
     ofstream temp;
     char l[2048];
-    int b, e; 
+    size_t b, e; 
     unsigned int state = 0;
     b = filepath.rfind("/");
     if(b == string::npos) b = -1;
