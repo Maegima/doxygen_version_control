@@ -145,9 +145,13 @@ string getLastInformation(string filepath){
     file.close();
     return info;
 }
-
+// TODO: make it user specified
 bool validExtension(string file){
     size_t size = file.size();
+    if(file.find(".l", size-2) != string::npos)
+        return true;
+    if(file.find(".y", size-2) != string::npos)
+        return true;
     if(file.find(".h", size-2) != string::npos)
         return true;
     if(file.find(".c", size-2) != string::npos)
