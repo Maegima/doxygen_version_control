@@ -160,6 +160,12 @@ bool validExtension(string file){
         return true;
     if(file.find(".hpp", size-4) != string::npos)
         return true;
+    if(file.find(".tpp", size-4) != string::npos)
+        return true;
+    if(file.find(".tcc", size-4) != string::npos)
+        return true;
+    if(file.find(".ipp", size-4) != string::npos)
+        return true;
     return false;
 }
 
